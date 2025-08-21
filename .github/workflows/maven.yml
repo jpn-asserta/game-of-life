@@ -1,0 +1,103 @@
+# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Java CI with Maven
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Generate changelog
+        run: |
+          git log -1 --pretty=format:"%h - %s (%an)" > CHANGELOG.md
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Change pom version
+        run: mvn versions:set -DnewVersion=${{ env.APP_VERSION }}.${{ github.run_number }} -DgenerateBackupPoms=false
+
+      - name: Extract versions from pom.xml
+        id: get_version
+        run: |
+          APP_VERSION=$(mvn help:evaluate -Dexpression=app-version -q -DforceStdout)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          BD_VERSION=$(mvn help:evaluate -Dexpression=bd-version -q -DforceStdout)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          BD_H_VERSION=$(mvn help:evaluate -Dexpression=bd-version-historica -q -DforceStdout)
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+
+      - name: Create version.properties file
+        run: |
+          echo "version.tecnica=${{ env.APP_VERSION }}.${{ github.run_number }}" > src/main/resources/version.properties
+          echo "version.comercial=${{ env.APP_VERSION }}" >> src/main/resources/version.properties
+          echo "version.bd=${{ env.BD_VERSION }}" >> src/main/resources/version.properties
+          echo "version.bd.historica=${{ env.BD_H_VERSION }}" >> src/main/resources/version.properties
+
+      - name: Run JUnit tests
+        run: mvn test || echo "Tests failed but continuing..."
+
+      - name: Build WAR file
+        run: mvn -B clean package --file pom.xml
+
+      - name: Upload WAR artifact
+        uses: actions/upload-artifact@v3
+        if: success()
+        with:
+          name: webapp-war
+          path: target/*.war
+
+      - name: Run tests with JaCoCo
+        run: mvn clean verify
+
+      - name: Save test results
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: junit-results
+          path: target/surefire-reports/
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v3
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+
+      - name: Upload WAR to Release
+        uses: softprops/action-gh-release@v1
+        if: success()
+        with:
+          tag_name: v${{ env.APP_VERSION }}.${{ github.run_number }}
+          name: Release v${{ env.APP_VERSION }}.${{ github.run_number }}
+          files: target/*.war
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Optional
+      #- name: Publish to GitHub Packages
+      #  run: mvn deploy
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean previous build
+        run: mvn clean
+
+    # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
+    # - name: Update dependency graph
+    #  uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+	<meta charset="UTF-8">
+	
+	<title>Game of Life</title>
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+	<style>
+		body {
+			font-family: sans-serif;
+			text-align: center;
+		}
+		
+		table {
+			margin: auto;
+			border-collapse: collapse;
+		}
+		
+		td {
+			width: 15px;
+			height: 15px;
+			border: 1px solid #ccc;
+		}
+		
+		.alive {
+			background-color: black;
+		}
+		
+		.dead {
+			background-color: white;
+		}
+		
+		button {
+			margin: 10px;
+			padding: 10px 20px;
+		}
+	</style>
+</head>
+<body>
+	<h1>Game of Life</h1>
+	<div>
+		<button onclick="init()">Initialize</button>
+		<button onclick="update()">Next Generation</button>
+		<button onclick="autoPlay()">Auto</button>
+		<button onclick="stopPlay()">Stop</button>
+	</div>
+	<div id="gridDiv"></div>
+
+	<script>
+
+    	let intervalId = null;
+
+        function drawGrid(data) {
+            const div = document.getElementById("gridDiv");
+            let html = "<table>";
+            for (let row of data) {
+                html += "<tr>";
+                for (let cell of row) {
+                    html += `<td class="${cell === 1 ? 'alive' : 'dead'}"></td>`;
+                }
+                html += "</tr>";
+            }
+            html += "</table>";
+            div.innerHTML = html;
+        }
+
+        async function loadGrid() {
+            const res = await fetch("game/get");
+            const data = await res.json();
+            drawGrid(data);
+        }
+
+        async function init() {
+            await fetch("game/init", { method: "POST" });
+            loadGrid();
+        }
+
+        async function update() {
+            await fetch("game/update", { method: "POST" });
+            loadGrid();
+        }
+
+        function autoPlay() {
+            if (!intervalId) {
+                intervalId = setInterval(update, 300);
+            }
+        }
+
+        function stopPlay() {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+
+        // Initial grid
+        loadGrid();
+    </script>
+</body>
+</html>

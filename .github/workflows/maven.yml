@@ -122,8 +122,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: success()
         with:
-          tag_name: v${{ VERSION_APP }}
-          name: Release v${{ VERSION_APP }}
+          tag_name: v${{ env.VERSION_APP }}
+          name: Release v${{ env.VERSION_APP }}
           files: target/*.war
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -10,6 +10,28 @@ name: Java CI with Maven
 
 on:
   workflow_dispatch:
+    inputs:
+      app_version:
+        description: 'Aplication version:'
+        required: true
+        type: string
+        default: '1.0.0'
+      db_version:
+        description: 'DB version:'
+        required: true
+        type: string
+        default: '01.00.000'
+
+permissions:
+  contents: write
+
+env:
+  JAVA_VERSION: '21'
+  WAR_NAME: 'gameoflife'
+  SURFIRE_REPORT: 'surfire-report'
+  JACOCO_REPORT: 'jacoco-report'
+  VERSION_FILE: 'src/main/resources/version.properties'
+  VERSION_APP: '${{ inputs.app_version }}.${{ github.run_number }}'
 
 jobs:
   build:
@@ -18,73 +40,88 @@ jobs:
     steps:
     
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate changelog
-        run: |
-          git log -1 --pretty=format:"%h - %s (%an)" > CHANGELOG.md
-
+        uses: actions/checkout@v4     
+        with:
+          fetch-depth: 0
+    
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Change pom version
-        run: mvn versions:set -DnewVersion=${{ env.APP_VERSION }}.${{ github.run_number }} -DgenerateBackupPoms=false
-
-      - name: Extract versions from pom.xml
-        id: get_version
+      - name: Generate changelog
         run: |
-          APP_VERSION=$(mvn help:evaluate -Dexpression=app-version -q -DforceStdout)
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          BD_VERSION=$(mvn help:evaluate -Dexpression=bd-version -q -DforceStdout)
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
-          BD_H_VERSION=$(mvn help:evaluate -Dexpression=bd-version-historica -q -DforceStdout)
-          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          git log -1 --pretty=format:"%h - %s (%an)" > CHANGELOG.md
+          cat CHANGELOG.md
+
+     # - name: Extract versions from pom.xml
+     #   id: get_version
+     #   run: |
+     #     APP_VERSION=$(mvn help:evaluate -Dexpression=app-version -q -DforceStdout)
+     #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+     #     BD_VERSION=$(mvn help:evaluate -Dexpression=bd-version -q -DforceStdout)
+     #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+     #     BD_H_VERSION=$(mvn help:evaluate -Dexpression=bd-version-historica -q -DforceStdout)
+     #     echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
       - name: Create version.properties file
         run: |
-          echo "version.tecnica=${{ env.APP_VERSION }}.${{ github.run_number }}" > src/main/resources/version.properties
-          echo "version.comercial=${{ env.APP_VERSION }}" >> src/main/resources/version.properties
-          echo "version.bd=${{ env.BD_VERSION }}" >> src/main/resources/version.properties
-          echo "version.bd.historica=${{ env.BD_H_VERSION }}" >> src/main/resources/version.properties
+          echo "version.tecnica=$VERSION_APP" > $VERSION_FILE
+          echo "version.comercial=${{ inputs.app_version }}" >> $VERSION_FILE
+          echo "version.bd=${{ inputs.db_version }}" >> $VERSION_FILE
+
+      - name: Change pom version
+        run: mvn versions:set -DnewVersion=$VERSION_APP -DgenerateBackupPoms=false
 
       - name: Run JUnit tests
-        run: mvn test || echo "Tests failed but continuing..."
+        run: mvn -B clean org.jacoco:jacoco-maven-plugin:prepare-agent test org.jacoco:jacoco-maven-plugin:report
 
-      - name: Build WAR file
-        run: mvn -B clean package --file pom.xml
-
-      - name: Upload WAR artifact
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: webapp-war
-          path: target/*.war
-
-      - name: Run tests with JaCoCo
-        run: mvn clean verify
-
-      - name: Save test results
-        if: success()
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
-          name: junit-results
+          name: ${{ env.SURFIRE_REPORT }}
           path: target/surefire-reports/
 
       - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
         with:
-          name: jacoco-report
+          name: ${{ env.JACOCO_REPORT }}
           path: target/site/jacoco/
+
+      - name: Build WAR file
+        run: mvn -B clean package -DskipTests=true
+
+      - name: Upload WAR artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ${{ env.WAR_NAME }}
+          path: target/*.war
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push pom.xml and VERSION_FILE
+        run: |
+          git add pom.xml
+          git add $VERSION_FILE
+          git commit -m "Update version to $VERSION_APP from workflow" || echo "No changes to commit"
+          git push origin HEAD
+
+      - name: Create tag
+        run: |
+          git tag -a "v$VERSION_APP" -m "Release $VERSION_APP"
+          git push origin "v$VERSION_APP"
 
       - name: Upload WAR to Release
         uses: softprops/action-gh-release@v2
         if: success()
         with:
-          tag_name: v${{ env.APP_VERSION }}.${{ github.run_number }}
-          name: Release v${{ env.APP_VERSION }}.${{ github.run_number }}
+          tag_name: v${{ VERSION_APP }}
+          name: Release v${{ VERSION_APP }}
           files: target/*.war
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -99,5 +136,5 @@ jobs:
         run: mvn clean
 
     # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
-    # - name: Update dependency graph
-    #  uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6
+      - name: Update dependency graph
+        uses: advanced-security/maven-dependency-submission-action@v5

@@ -27,17 +27,19 @@ permissions:
 
 env:
   JAVA_VERSION: '21'
-  WAR_NAME: 'gameoflife'
-  SURFIRE_REPORT: 'surfire-report'
-  JACOCO_REPORT: 'jacoco-report'
+  REPORT_SURFIRE: 'surfire-report'
+  REPORT_JACOCO: 'jacoco-report'
   VERSION_FILE: 'src/main/resources/version.properties'
-  VERSION_APP: '${{ inputs.app_version }}.${{ github.run_number }}'
-
+  WAR_NAME: 'gameoflife'
+  
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Set VERSION_APP
+        run: echo "VERSION_APP=${{ github.event.inputs.app_version }}.${{ github.run_number }}" >> $GITHUB_ENV
     
       - name: Checkout code
         uses: actions/checkout@v4     
@@ -68,8 +70,8 @@ jobs:
       - name: Create version.properties file
         run: |
           echo "version.tecnica=$VERSION_APP" > $VERSION_FILE
-          echo "version.comercial=${{ inputs.app_version }}" >> $VERSION_FILE
-          echo "version.bd=${{ inputs.db_version }}" >> $VERSION_FILE
+          echo "version.comercial=${{ github.event.inputs.app_version }}" >> $VERSION_FILE
+          echo "version.bd=${{ github.event.inputs.db_version }}" >> $VERSION_FILE
 
       - name: Change pom version
         run: mvn versions:set -DnewVersion=$VERSION_APP -DgenerateBackupPoms=false
@@ -80,13 +82,13 @@ jobs:
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.SURFIRE_REPORT }}
+          name: ${{ env.REPORT_SURFIRE }}
           path: target/surefire-reports/
 
       - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.JACOCO_REPORT }}
+          name: ${{ env.REPORT_JACOCO }}
           path: target/site/jacoco/
 
       - name: Build WAR file

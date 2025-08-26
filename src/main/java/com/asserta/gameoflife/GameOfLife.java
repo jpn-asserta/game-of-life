@@ -1,5 +1,13 @@
 package com.asserta.gameoflife;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+
 import org.springframework.stereotype.Component;
 
 @Component
@@ -7,6 +15,7 @@ public class GameOfLife {
 	private int rows = 0;
 	private int cols = 0;
 	private int[][] grid = null;
+	private File saveFile = null;
 
 	public GameOfLife() {
 		rows = 20;
@@ -26,6 +35,8 @@ public class GameOfLife {
 				grid[i][j] = Math.random() < 0.3 ? 1 : 0;
 			}
 		}
+		saveFile = initSaveFile();
+		saveGrid();
 	}
 
 	public int[][] getGrid() {
@@ -44,6 +55,7 @@ public class GameOfLife {
 		}
 
 		grid = newGrid;
+		saveGrid();
 	}
 
 	private int countNeighbors(int x, int y) {
@@ -60,5 +72,41 @@ public class GameOfLife {
 			}
 		}
 		return counter;
+	}
+	
+	private File initSaveFile() {
+		try {
+			// BAD: -rw-r--r--
+			return File.createTempFile("/tmp/game_" + System.currentTimeMillis(), ".txt");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	private void saveGrid() {
+		
+		if (saveFile == null) {
+			return;
+		}
+		
+		try {
+			
+			StringBuilder gridST = new StringBuilder(rows * cols * 2 + rows + 1);
+			
+			for (int[] row : grid) {
+				for (int cell : row) {
+					gridST.append(cell).append("|");
+				}
+				gridST.append("\n");
+			}
+			gridST.append("\n");
+			
+			try (BufferedWriter writer = new BufferedWriter(new FileWriter(saveFile, true))) {
+				writer.write(gridST.toString());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 }

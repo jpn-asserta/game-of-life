@@ -5,7 +5,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
 import org.springframework.stereotype.Component;
@@ -15,7 +17,7 @@ public class GameOfLife {
 	private int rows = 0;
 	private int cols = 0;
 	private int[][] grid = null;
-	private File saveFile = null;
+	private Path saveFile = null;
 
 	public GameOfLife() {
 		rows = 20;
@@ -74,14 +76,20 @@ public class GameOfLife {
 		return counter;
 	}
 	
-	private File initSaveFile() {
+	private Path initSaveFile() {
+		
+		Path tempFile = null;
+		
 		try {
-			// BAD: -rw-r--r--
-			return File.createTempFile("/tmp/game_" + System.currentTimeMillis(), ".txt");
+			
+			Path tempDir = Files.createTempDirectory("gameoflife");
+			tempFile = Files.createTempFile(tempDir, "game_", ".txt");
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		return null;
+		
+		return tempFile;
 	}
 	
 	private void saveGrid() {
@@ -102,9 +110,11 @@ public class GameOfLife {
 			}
 			gridST.append("\n");
 			
-			try (BufferedWriter writer = new BufferedWriter(new FileWriter(saveFile, true))) {
-				writer.write(gridST.toString());
+			try (BufferedWriter writer = Files.newBufferedWriter(saveFile, StandardCharsets.UTF_8, 
+			        StandardOpenOption.APPEND)) {
+			    writer.write(gridST.toString());
 			}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

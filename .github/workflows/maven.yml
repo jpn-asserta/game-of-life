@@ -6,7 +6,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Java CI with Maven
+name: Create complete release
 
 on:
   workflow_dispatch:
@@ -27,6 +27,8 @@ permissions:
 
 env:
   JAVA_VERSION: '21'
+  LIB_SAVEGRID_PATH: 'lib/savegrid-1.0.jar'
+  LIB_SAVEGRID_VERSION: '1.0'
   REPORT_SURFIRE: 'surfire-report'
   REPORT_JACOCO: 'jacoco-report'
   VERSION_FILE: 'src/main/resources/version.properties'
@@ -45,12 +47,21 @@ jobs:
         uses: actions/checkout@v4     
         with:
           fetch-depth: 0
-    
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install savegrid-1.0.jar to local Maven repo
+        run: |
+          mvn install:install-file \
+            -Dfile=${{ env.LIB_SAVEGRID_PATH }} \
+            -DgroupId=com.asserta \
+            -DartifactId=savegrid \
+            -Dversion=${{ env.LIB_SAVEGRID_VERSION }} \
+            -Dpackaging=jar
 
       - name: Generate changelog
         run: |

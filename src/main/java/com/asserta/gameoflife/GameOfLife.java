@@ -1,16 +1,12 @@
 package com.asserta.gameoflife;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
 import org.springframework.stereotype.Component;
+
+import com.asserta.savegrid.SaveGrid;
 
 @Component
 public class GameOfLife {
@@ -98,25 +94,6 @@ public class GameOfLife {
 			return;
 		}
 		
-		try {
-			
-			StringBuilder gridST = new StringBuilder(rows * cols * 2 + rows + 1);
-			
-			for (int[] row : grid) {
-				for (int cell : row) {
-					gridST.append(cell).append("|");
-				}
-				gridST.append("\n");
-			}
-			gridST.append("\n");
-			
-			try (BufferedWriter writer = Files.newBufferedWriter(saveFile, StandardCharsets.UTF_8, 
-			        StandardOpenOption.APPEND)) {
-			    writer.write(gridST.toString());
-			}
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		SaveGrid.saveBinary(grid, saveFile);
 	}
 }
